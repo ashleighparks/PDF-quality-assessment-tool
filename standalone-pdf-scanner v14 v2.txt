@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Chatbot Readiness Scanner</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
+    <style>
+        .upload-zone {
+            transition: all 0.3s ease;
+        }
+        .upload-zone:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
+    <div class="max-w-5xl mx-auto p-6">
+        <!-- Header -->
+        <div class="text-center mb-10">
+            <div class="mb-4">
+                <div class="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                </div>
+            </div>
+            <h1 class="text-4xl font-bold text-gray-900 mb-3">
+                PDF Image Content Scanner
+            </h1>
+            <p class="text-lg text-gray-600 max-w-2xl mx-auto">
+                Detect image-heavy PDFs that cause text extraction issues. 
+                Focused on identifying scanned documents, screenshot tables, and image-based content.
+            </p>
+        </div>
+
+        <!-- Main Content -->
+        <div class="bg-white rounded-2xl shadow-xl p-8">
+            <!-- Upload Section -->
+            <div id="upload-section" class="mb-8">
+                <div id="upload-zone" 
+                     class="upload-zone border-3 border-dashed border-blue-300 rounded-xl p-12 text-center bg-blue-50 hover:bg-blue-100 cursor-pointer">
+                    <div class="mb-6">
+                        <svg class="w-16 h-16 text-blue-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                        </svg>
+                    </div>
+                    <div class="text-xl font-semibold text-blue-600 mb-2">Upload PDF Document</div>
+                    <div class="text-gray-500 mb-4">Drag and drop your PDF here, or click to browse</div>
+                    <div class="text-sm text-gray-400">Maximum file size: 50MB • Only PDF files accepted</div>
+                    <input type="file" id="file-input" accept=".pdf" class="hidden">
+                </div>
+            </div>
+
+            <!-- File Info Section -->
+            <div id="file-info" class="hidden mb-8">
+                <div class="bg-gray-50 rounded-lg p-6">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-4">
+                            <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                                <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <div id="file-name" class="font-semibold text-gray-900"></div>
+                                <div id="file-size" class="text-sm text-gray-500"></div>
+                            </div>
+                        </div>
+                        <div class="flex space-x-3">
+                            <button id="remove-btn" class="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors">
+                                Remove
+                            </button>
+                            <button id="analyze-btn" class="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-semibold">
+                                Analyze Document
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Analysis Progress -->
+            <div id="analysis-progress" class="hidden mb-8">
+                <div class="bg-blue-50 rounded-lg p-6">
+                    <div class="flex items-center space-x-4">
+                        <div class="spinner"></div>
+                        <div>
+                            <div class="font-semibold text-blue-900">Analyzing PDF Structure...</div>
+                            <div class="text-sm text-blue-700" id="progress-text">Extracting text and analyzing document quality</div>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <div class="w-full bg-blue-200 rounded-full h-2">
+                            <div id="progress-bar" class="bg-blue-600 h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Section -->
+            <div id="results" class="hidden fade-in">
+                <!-- Main Result Card -->
+                <div id="result-card" class="rounded-xl p-8 border-2 mb-6">
+                    <div class="flex items-center space-x-4 mb-6">
+                        <div id="result-icon" class="w-12 h-12 rounded-full flex items-center justify-center">
+                            <!-- Icon will be inserted here -->
+                        </div>
+                        <div>
+                            <div id="result-title" class="text-2xl font-bold"></div>
+                            <div id="result-confidence" class="text-lg"></div>
+                        </div>
+                    </div>
+                    <div id="result-message" class="text-base mb-4"></div>
+                    <div id="recommendation" class="hidden">
+                        <div class="bg-white rounded-lg p-4 border">
+                            <div class="font-semibold mb-2">💡 Recommendation:</div>
+                            <div class="font-medium text-red-800">→ Professional Guide Service Recommended</div>
+                            <div class="text-sm mt-2 text-gray-600">
+                                Our team can optimize this document to ensure perfect chatbot compatibility.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Detailed Breakdown -->
+                <div class="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+                    <h4 class="font-semibold text-gray-900 mb-6 text-lg">Analysis Breakdown</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="text-center">
+                            <div class="w-20 h-20 mx-auto mb-3 relative">
+                                <svg class="transform -rotate-90 w-20 h-20">
+                                    <circle cx="10" cy="10" r="8" stroke="#e5e7eb" stroke-width="2" fill="none" class="translate-x-1 translate-y-1"/>
+                                    <circle id="text-circle" cx="10" cy="10" r="8" stroke="#3b82f6" stroke-width="2" fill="none" 
+                                            stroke-dasharray="50.27" stroke-dashoffset="50.27" class="translate-x-1 translate-y-1"/>
+                                </svg>
+                                <div class="absolute inset-0 flex items-center justify-center">
+                                    <span id="text-score" class="text-sm font-bold text-blue-600">0%</span>
+                                </div>
+                            </div>
+                            <div class="font-medium text-gray-900">Text Accessibility</div>
+                            <div class="text-sm text-gray-500">Searchable content quality</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="w-20 h-20 mx-auto mb-3 relative">
+                                <svg class="transform -rotate-90 w-20 h-20">
+                                    <circle cx="10" cy="10" r="8" stroke="#e5e7eb" stroke-width="2" fill="none" class="translate-x-1 translate-y-1"/>
+                                    <circle id="structure-circle" cx="10" cy="10" r="8" stroke="#10b981" stroke-width="2" fill="none" 
+                                            stroke-dasharray="50.27" stroke-dashoffset="50.27" class="translate-x-1 translate-y-1"/>
+                                </svg>
+                                <div class="absolute inset-0 flex items-center justify-center">
+                                    <span id="structure-score" class="text-sm font-bold text-green-600">0%</span>
+                                </div>
+                            </div>
+                            <div class="font-medium text-gray-900">Document Structure</div>
+                            <div class="text-sm text-gray-500">Organization & navigation</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="w-20 h-20 mx-auto mb-3 relative">
+                                <svg class="transform -rotate-90 w-20 h-20">
+                                    <circle cx="10" cy="10" r="8" stroke="#e5e7eb" stroke-width="2" fill="none" class="translate-x-1 translate-y-1"/>
+                                    <circle id="table-circle" cx="10" cy="10" r="8" stroke="#f59e0b" stroke-width="2" fill="none" 
+                                            stroke-dasharray="50.27" stroke-dashoffset="50.27" class="translate-x-1 translate-y-1"/>
+                                </svg>
+                                <div class="absolute inset-0 flex items-center justify-center">
+                                    <span id="table-score" class="text-sm font-bold text-yellow-600">0%</span>
+                                </div>
+                            </div>
+                            <div class="font-medium text-gray-900">Table Quality</div>
+                            <div class="text-sm text-gray-500">Data structure readability</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="flex justify-center space-x-4">
+                    <button id="reset-btn" class="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-semibold">
+                        Analyze Another Document
+                    </button>
+                    <button id="proceed-btn" class="hidden px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold">
+                        ✅ Proceed with Setup
+                    </button>
+                    <button id="guide-btn" class="hidden px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold">
+                        📋 Request Guide Service
+                    </button>
+                </div>
+            </div>
+
+            <!-- Error Display -->
+            <div id="error-display" class="hidden">
+                <div class="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center space-x-3">
+                    <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <span id="error-message" class="text-red-800"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="text-center mt-8 text-sm text-gray-500">
+            <p>Image-Focused PDF Scanner • Detects scanned docs and image-heavy content • No data leaves your browser</p>
+        </div>
+    </div>
+
+    <script>
+        // Simplified Image-Focused PDF Analysis Engine
+        // Primary goal: Detect image-based content that breaks text extraction
+        class ImageFocusedPDFAnalyzer {
+            constructor() {
+                this.maxFileSize = 50 * 1024 * 1024; // 50MB
+            }
+
+            async analyzePDF(file) {
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+                
+                // Quick blockers check
+                const blockersCheck = await this.checkBasicBlockers(pdf, file);
+                if (blockersCheck.hasBlockers) {
+                    return this.createBlockedResult(blockersCheck);
+                }
+                
+                // Focus on the main issue: image vs text content
+                const imageTextAnalysis = await this.analyzeImageVsText(pdf);
+                const textExtractionTest = await this.testTextExtraction(pdf);
+                const basicStructureCheck = await this.checkBasicStructure(pdf);
+                
+                return this.calculateSimplifiedScore({
+                    imageTextAnalysis,
+                    textExtractionTest,
+                    basicStructureCheck
+                });
+            }
+
+            async checkBasicBlockers(pdf, file) {
+                const blockers = [];
+                
+                try {
+                    // Only check for real blockers that prevent processing
+                    if (file.size > 25 * 1024 * 1024) {
+                        blockers.push("File exceeds API upload limits (>25MB)");
+                    }
+                    
+                    if (pdf.numPages > 200) {
+                        blockers.push("Too many pages may cause processing timeout");
+                    }
+                    
+                    // Test if we can extract any text at all
+                    const firstPage = await pdf.getPage(1);
+                    const firstPageText = await firstPage.getTextContent();
+                    
+                    if (!firstPageText.items || firstPageText.items.length === 0) {
+                        blockers.push("No text found - appears to be scanned images only");
+                    }
+                    
+                } catch (error) {
+                    blockers.push("PDF appears corrupted or unreadable");
+                }
+                
+                return {
+                    hasBlockers: blockers.length > 0,
+                    blockers
+                };
+            }
+
+            createBlockedResult(blockersCheck) {
+                return {
+                    suitable: false,
+                    confidence: 0,
+                    blocked: true,
+                    blockers: blockersCheck.blockers,
+                    breakdown: {
+                        textContent: 0,
+                        imageContent: 100,
+                        overallQuality: 0
+                    },
+                    recommendations: [
+                        "BLOCKED: Document cannot be processed",
+                        ...blockersCheck.blockers,
+                        "REQUIRED: Professional Guide Service to resolve issues"
+                    ]
+                };
+            }
+
+            async analyzeImageVsText(pdf) {
+                let totalTextLength = 0;
+                let totalImageArea = 0;
+                let pagesWithImages = 0;
+                let pagesWithMeaningfulText = 0;
+                
+                const samplePages = Math.min(10, pdf.numPages);
+                
+                for (let i = 1; i <= samplePages; i++) {
+                    const page = await pdf.getPage(i);
+                    
+                    // Extract text content
+                    const textContent = await page.getTextContent();
+                    const pageText = textContent.items.map(item => item.str).join(' ');
+                    const cleanText = pageText.replace(/\s+/g, ' ').trim();
+                    
+                    // Count meaningful text (not just page numbers/headers)
+                    if (cleanText.length > 100) {
+                        pagesWithMeaningfulText++;
+                        totalTextLength += cleanText.length;
+                    }
+                    
+                    // Check for images/embedded objects
+                    try {
+                        const viewport = page.getViewport({ scale: 1.0 });
+                        const pageArea = viewport.width * viewport.height;
+                        
+                        // Look for XObjects (images, forms, etc.)
+                        const resources = await page.getOperatorList();
+                        let hasSignificantImages = false;
+                        
+                        // Simple heuristic: if page has very little text but normal page size,
+                        // it's likely image-heavy
+                        const textDensity = cleanText.length / pageArea;
+                        if (textDensity < 0.01 && cleanText.length < 200) {
+                            hasSignificantImages = true;
+                            totalImageArea += pageArea * 0.8; // Estimate 80% image coverage
+                        }
+                        
+                        if (hasSignificantImages) {
+                            pagesWithImages++;
+                        }
+                        
+                    } catch (error) {
+                        // If we can't analyze the page structure, assume it's problematic
+                        pagesWithImages++;
+                    }
+                }
+                
+                const textToImageRatio = totalTextLength / Math.max(totalImageArea / 1000, 1);
+                const textPageRatio = pagesWithMeaningfulText / samplePages;
+                const imagePageRatio = pagesWithImages / samplePages;
+                
+                return {
+                    textPageRatio,
+                    imagePageRatio,
+                    textToImageRatio,
+                    avgTextPerPage: totalTextLength / Math.max(pagesWithMeaningfulText, 1),
+                    hasImageProblem: imagePageRatio > 0.3 || textPageRatio < 0.7
+                };
+            }
+
+            async testTextExtraction(pdf) {
+                let extractionQuality = 100;
+                let extractionIssues = [];
+                
+                // Test a few pages for extraction quality
+                const testPages = Math.min(3, pdf.numPages);
+                
+                for (let i = 1; i <= testPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const textContent = await page.getTextContent();
+                    const text = textContent.items.map(item => item.str).join(' ');
+                    
+                    // Check for common extraction problems
+                    if (text.includes(' ') || text.includes('?')) {
+                        extractionQuality -= 15;
+                        extractionIssues.push("Unicode/encoding issues detected");
+                    }
+                    
+                    // Check for OCR artifacts
+                    const ocrArtifacts = text.match(/[|]{2,}|_{3,}|\.{4,}|\s{10,}/g);
+                    if (ocrArtifacts && ocrArtifacts.length > 2) {
+                        extractionQuality -= 20;
+                        extractionIssues.push("OCR artifacts suggest scanned content");
+                    }
+                    
+                    // Check for reasonable text density
+                    const words = text.split(/\s+/).filter(word => word.length > 2);
+                    if (words.length < 20) {
+                        extractionQuality -= 10;
+                        extractionIssues.push("Very low text content per page");
+                    }
+                }
+                
+                return {
+                    quality: Math.max(0, extractionQuality),
+                    issues: extractionIssues,
+                    hasExtractionProblems: extractionQuality < 70
+                };
+            }
+
+            async checkBasicStructure(pdf) {
+                // Very basic structure check - just looking for reasonable organization
+                let structureScore = 50; // Start neutral
+                
+                try {
+                    const firstPage = await pdf.getPage(1);
+                    const textContent = await firstPage.getTextContent();
+                    const text = textContent.items.map(item => item.str).join('\n');
+                    
+                    // Look for any signs of structure
+                    const lines = text.split('\n').filter(line => line.trim().length > 5);
+                    
+                    // Basic heading detection
+                    let potentialHeadings = 0;
+                    for (const line of lines.slice(0, 15)) { // First 15 lines
+                        const trimmed = line.trim();
+                        if (trimmed.length < 60 && (
+                            trimmed.toUpperCase() === trimmed ||
+                            trimmed.endsWith(':') ||
+                            /^\d+\./.test(trimmed)
+                        )) {
+                            potentialHeadings++;
+                        }
+                    }
+                    
+                    if (potentialHeadings >= 2) {
+                        structureScore += 30; // Has some structure
+                    }
+                    
+                    if (pdf.numPages >= 2 && pdf.numPages <= 50) {
+                        structureScore += 20; // Reasonable length
+                    }
+                    
+                } catch (error) {
+                    structureScore = 30; // Lower score if we can't analyze
+                }
+                
+                return {
+                    score: Math.min(100, structureScore),
+                    hasBasicStructure: structureScore >= 60
+                };
+            }
+
+            calculateSimplifiedScore(analyses) {
+                const { imageTextAnalysis, textExtractionTest, basicStructureCheck } = analyses;
+                
+                let score = 0;
+                
+                // Primary factor: Text vs Image content (60% of score)
+                const textContentScore = imageTextAnalysis.textPageRatio * 60;
+                const imagePenalty = imageTextAnalysis.imagePageRatio * 30;
+                score += Math.max(0, textContentScore - imagePenalty);
+                
+                // Text extraction quality (30% of score)  
+                score += (textExtractionTest.quality / 100) * 30;
+                
+                // Basic structure (10% of score)
+                score += (basicStructureCheck.score / 100) * 10;
+                
+                const finalScore = Math.round(Math.max(0, Math.min(score, 100)));
+                
+                // Relaxed threshold - 65% instead of 80%
+                const suitable = finalScore >= 65;
+                
+                // Create breakdown for display
+                const breakdown = {
+                    textContent: Math.round(Math.max(0, textContentScore - imagePenalty)),
+                    imageContent: Math.round(100 - (imageTextAnalysis.textPageRatio * 100)),
+                    overallQuality: Math.round((textExtractionTest.quality / 100) * 30 + (basicStructureCheck.score / 100) * 10)
+                };
+                
+                return {
+                    suitable,
+                    confidence: finalScore,
+                    breakdown,
+                    blocked: false,
+                    rawAnalyses: analyses,
+                    recommendations: this.generateSimpleRecommendations(analyses, finalScore)
+                };
+            }
+
+            generateSimpleRecommendations(analyses, score) {
+                const recommendations = [];
+                const { imageTextAnalysis, textExtractionTest, basicStructureCheck } = analyses;
+                
+                if (imageTextAnalysis.hasImageProblem) {
+                    recommendations.push("High image content detected - may contain screenshots or scanned tables");
+                }
+                
+                if (textExtractionTest.hasExtractionProblems) {
+                    recommendations.push("Text extraction issues found - likely contains scanned or image-based content");
+                }
+                
+                if (textExtractionTest.issues.length > 0) {
+                    recommendations.push(`Specific issues: ${textExtractionTest.issues.join(", ")}`);
+                }
+                
+                if (score < 65) {
+                    recommendations.push("RECOMMEND: Professional Guide Service to optimize for text extraction");
+                    recommendations.push("Document likely contains too much image-based content for optimal chatbot performance");
+                } else if (score >= 65 && score < 80) {
+                    recommendations.push("Document should work but may have some image-based content issues");
+                    recommendations.push("Consider Professional Guide Service for optimization");
+                } else {
+                    recommendations.push("Document appears to have good text content and should work well");
+                }
+                
+                return recommendations;
+            }
+        } 0) {
+                    dataPreservation = 90; // High score for text-only docs
+                }
+                
+                const tableScore = Math.max(0, Math.min(
+                    70 + dataPreservation + (structuredTables * 5) - (scrambledTables * 10),
+                    100
+                ));
+                
+                return {
+                    structuredTables,
+                    scrambledTables,
+                    dataPreservation,
+                    score: tableScore
+                };
+            }
+
+            calculateVectorScore(analyses) {
+                // Weights optimized for vector store + embeddings performance
+                const weights = {
+                    textExtractionQuality: 0.35,    // Must have clean text extraction
+                    embeddingOptimization: 0.25,    // Critical for vector relevance
+                    semanticStructure: 0.20,        // Helps with context retrieval
+                    noiseToSignalRatio: 0.15,       // Reduces embedding pollution
+                    tableDataIntegrity: 0.05        // Tables less critical for embeddings
+                };
+                
+                const weightedScore = 
+                    analyses.textExtractionQuality.score * weights.textExtractionQuality +
+                    analyses.embeddingOptimization.score * weights.embeddingOptimization +
+                    analyses.semanticStructure.score * weights.semanticStructure +
+                    analyses.noiseToSignalRatio.score * weights.noiseToSignalRatio +
+                    analyses.tableDataIntegrity.score * weights.tableDataIntegrity;
+                
+                const finalScore = Math.round(Math.max(0, Math.min(weightedScore, 100)));
+                
+                // Higher threshold for vector optimization (80% vs 70%)
+                const suitable = finalScore >= 80;
+                
+                const breakdown = {
+                    textExtractionQuality: Math.round(analyses.textExtractionQuality.score * weights.textExtractionQuality),
+                    embeddingOptimization: Math.round(analyses.embeddingOptimization.score * weights.embeddingOptimization),
+                    semanticStructure: Math.round(analyses.semanticStructure.score * weights.semanticStructure),
+                    noiseToSignalRatio: Math.round(analyses.noiseToSignalRatio.score * weights.noiseToSignalRatio),
+                    tableDataIntegrity: Math.round(analyses.tableDataIntegrity.score * weights.tableDataIntegrity)
+                };
+                
+                return {
+                    suitable,
+                    confidence: finalScore,
+                    breakdown,
+                    rawAnalyses: analyses,
+                    blocked: false,
+                    recommendations: this.generateVectorRecommendations(analyses, finalScore)
+                };
+            }
+
+            generateVectorRecommendations(analyses, score) {
+                const recommendations = [];
+                
+                if (analyses.textExtractionQuality.score < 70) {
+                    recommendations.push("Poor text extraction quality - will create bad embeddings");
+                }
+                
+                if (analyses.embeddingOptimization.benefitsTermDensity < 5) {
+                    recommendations.push("Low benefits terminology density - vector search may miss key concepts");
+                }
+                
+                if (analyses.semanticStructure.score < 60) {
+                    recommendations.push("Poor semantic structure - AI will struggle with context retrieval");
+                }
+                
+                if (analyses.noiseToSignalRatio.signalRatio < 70) {
+                    recommendations.push("High noise content - will pollute vector embeddings");
+                }
+                
+                if (analyses.tableDataIntegrity.scrambledTables > 0) {
+                    recommendations.push("Tables will extract as scrambled text - data integrity compromised");
+                }
+                
+                if (score < 80) {
+                    recommendations.push("RECOMMEND: Professional Guide Service for vector store optimization");
+                    recommendations.push("Current design will likely produce poor chatbot responses");
+                } else {
+                    recommendations.push("Document is optimized for vector embeddings and should perform well");
+                }
+                
+                return recommendations;
+            }
+        }
+
+        // UI Controller
+        class UIController {
+            constructor() {
+                this.analyzer = new ImageFocusedPDFAnalyzer();
+                this.currentFile = null;
+                this.initializeEventListeners();
+            }
+
+            initializeEventListeners() {
+                const uploadZone = document.getElementById('upload-zone');
+                const fileInput = document.getElementById('file-input');
+                const analyzeBtn = document.getElementById('analyze-btn');
+                const removeBtn = document.getElementById('remove-btn');
+                const resetBtn = document.getElementById('reset-btn');
+
+                // Upload zone events
+                uploadZone.addEventListener('click', () => fileInput.click());
+                uploadZone.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    uploadZone.classList.add('bg-blue-100');
+                });
+                uploadZone.addEventListener('dragleave', () => {
+                    uploadZone.classList.remove('bg-blue-100');
+                });
+                uploadZone.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    uploadZone.classList.remove('bg-blue-100');
+                    const files = e.dataTransfer.files;
+                    if (files.length > 0) {
+                        this.handleFileSelection(files[0]);
+                    }
+                });
+
+                // File input change
+                fileInput.addEventListener('change', (e) => {
+                    if (e.target.files.length > 0) {
+                        this.handleFileSelection(e.target.files[0]);
+                    }
+                });
+
+                // Button events
+                analyzeBtn.addEventListener('click', () => this.analyzePDF());
+                removeBtn.addEventListener('click', () => this.reset());
+                resetBtn.addEventListener('click', () => this.reset());
+            }
+
+            handleFileSelection(file) {
+                if (!file.type.includes('pdf')) {
+                    this.showError('Please select a PDF file only.');
+                    return;
+                }
+
+                if (file.size > this.analyzer.maxFileSize) {
+                    this.showError('File is too large. Maximum size is 50MB.');
+                    return;
+                }
+
+                this.currentFile = file;
+                this.showFileInfo(file);
+                this.hideError();
+            }
+
+            showFileInfo(file) {
+                document.getElementById('file-name').textContent = file.name;
+                document.getElementById('file-size').textContent = `${(file.size / 1024 / 1024).toFixed(2)} MB`;
+                
+                document.getElementById('upload-section').classList.add('hidden');
+                document.getElementById('file-info').classList.remove('hidden');
+            }
+
+            async analyzePDF() {
+                if (!this.currentFile) return;
+
+                this.showProgress();
+
+                try {
+                    // Simulate progress updates
+                    this.updateProgress(10, 'Reading PDF structure...');
+                    await this.delay(500);
+                    
+                    this.updateProgress(40, 'Analyzing text content...');
+                    await this.delay(500);
+                    
+                    this.updateProgress(70, 'Checking document organization...');
+                    const result = await this.analyzer.analyzePDF(this.currentFile);
+                    
+                    this.updateProgress(90, 'Calculating readiness score...');
+                    await this.delay(300);
+                    
+                    this.updateProgress(100, 'Analysis complete!');
+                    await this.delay(500);
+
+                    this.showResults(result);
+                } catch (error) {
+                    console.error('Analysis failed:', error);
+                    this.showError('Analysis failed. Please try a different PDF file.');
+                    this.hideProgress();
+                }
+            }
+
+            showProgress() {
+                document.getElementById('file-info').classList.add('hidden');
+                document.getElementById('analysis-progress').classList.remove('hidden');
+            }
+
+            hideProgress() {
+                document.getElementById('analysis-progress').classList.add('hidden');
+            }
+
+            updateProgress(percent, text) {
+                document.getElementById('progress-bar').style.width = `${percent}%`;
+                document.getElementById('progress-text').textContent = text;
+            }
+
+            showResults(result) {
+                this.hideProgress();
+                
+                // Main result card
+                const resultCard = document.getElementById('result-card');
+                const resultIcon = document.getElementById('result-icon');
+                const resultTitle = document.getElementById('result-title');
+                const resultConfidence = document.getElementById('result-confidence');
+                const resultMessage = document.getElementById('result-message');
+                const recommendation = document.getElementById('recommendation');
+
+                if (result.suitable) {
+                    resultCard.className = 'rounded-xl p-8 border-2 mb-6 bg-green-50 border-green-200';
+                    resultIcon.className = 'w-12 h-12 rounded-full flex items-center justify-center bg-green-100';
+                    resultIcon.innerHTML = '<svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>';
+                    resultTitle.textContent = '✅ APPROVED - Chatbot Ready';
+                    resultTitle.className = 'text-2xl font-bold text-green-900';
+                    resultConfidence.textContent = `${result.confidence}% Confidence Score`;
+                    resultConfidence.className = 'text-lg text-green-800';
+                    resultMessage.textContent = 'This document will work well with our chatbot system.';
+                    resultMessage.className = 'text-base mb-4 text-green-800';
+                    recommendation.classList.add('hidden');
+                    document.getElementById('proceed-btn').classList.remove('hidden');
+                    document.getElementById('guide-btn').classList.add('hidden');
+                } else {
+                    resultCard.className = 'rounded-xl p-8 border-2 mb-6 bg-red-50 border-red-200';
+                    resultIcon.className = 'w-12 h-12 rounded-full flex items-center justify-center bg-red-100';
+                    resultIcon.innerHTML = '<svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>';
+                    resultTitle.textContent = '❌ NOT SUITABLE';
+                    resultTitle.className = 'text-2xl font-bold text-red-900';
+                    resultConfidence.textContent = `${result.confidence}% Confidence Score`;
+                    resultConfidence.className = 'text-lg text-red-800';
+                    resultMessage.textContent = 'This document needs optimization for chatbot compatibility.';
+                    resultMessage.className = 'text-base mb-4 text-red-800';
+                    recommendation.classList.remove('hidden');
+                    document.getElementById('proceed-btn').classList.add('hidden');
+                    document.getElementById('guide-btn').classList.remove('hidden');
+                }
+
+                // Update breakdown circles
+                this.animateCircle('text-circle', 'text-score', result.breakdown.textAccessibility, '#3b82f6');
+                this.animateCircle('structure-circle', 'structure-score', result.breakdown.documentStructure, '#10b981');
+                this.animateCircle('table-circle', 'table-score', result.breakdown.tableQuality, '#f59e0b');
+
+                document.getElementById('results').classList.remove('hidden');
+            }
+
+            animateCircle(circleId, scoreId, percentage, color) {
+                const circle = document.getElementById(circleId);
+                const scoreElement = document.getElementById(scoreId);
+                const circumference = 2 * Math.PI * 8; // radius = 8
+                const offset = circumference - (percentage / 100) * circumference;
+                
+                circle.style.stroke = color;
+                circle.style.strokeDashoffset = offset;
+                scoreElement.textContent = `${percentage}%`;
+                
+                // Add animation class
+                circle.style.transition = 'stroke-dashoffset 1s ease-in-out';
+            }
+
+            showError(message) {
+                document.getElementById('error-message').textContent = message;
+                document.getElementById('error-display').classList.remove('hidden');
+            }
+
+            hideError() {
+                document.getElementById('error-display').classList.add('hidden');
+            }
+
+            reset() {
+                this.currentFile = null;
+                document.getElementById('upload-section').classList.remove('hidden');
+                document.getElementById('file-info').classList.add('hidden');
+                document.getElementById('analysis-progress').classList.add('hidden');
+                document.getElementById('results').classList.add('hidden');
+                document.getElementById('file-input').value = '';
+                this.hideError();
+            }
+
+            delay(ms) {
+                return new Promise(resolve => setTimeout(resolve, ms));
+            }
+        }
+
+        // Initialize the application when DOM is loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            new UIController();
+        });
+    </script>
+</body>
+</html>
