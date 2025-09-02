@@ -3,144 +3,152 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>PDF Compatibility Scanner (Chatbot Readiness)</title>
+  <title>PDF Compatibility Scanner • Full-Document</title>
 
-  <!-- Tailwind CSS (CDN) -->
+  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- pdf.js (CDN) -->
+  <!-- pdf.js -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script>
-    // Configure pdf.js worker (must match version)
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   </script>
 
   <style>
     .circle-bg { stroke: #e5e7eb; } /* gray-200 */
-    .circle-fg { stroke-linecap: round; stroke-dasharray: 50.265; stroke-dashoffset: 50.265; } /* 2πr where r=8 => 50.265 */
+    .circle-fg { stroke-linecap: round; stroke-dasharray: 50.265; stroke-dashoffset: 50.265; }
+    .shine { background: linear-gradient(135deg, rgba(59,130,246,0.08), rgba(16,185,129,0.08)); }
+    .glass { backdrop-filter: blur(6px); }
   </style>
 </head>
-<body class="bg-gray-50 text-gray-900 antialiased">
-  <div class="max-w-3xl mx-auto p-6">
+<body class="bg-gradient-to-br from-slate-50 via-white to-blue-50 min-h-screen text-slate-900 antialiased">
+  <div class="max-w-4xl mx-auto p-6">
     <header class="mb-6">
-      <h1 class="text-3xl font-bold">PDF Compatibility Scanner</h1>
-      <p class="text-gray-600 mt-1">Assess whether a PDF is likely to work well with the chatbot. Confidence = average of Text Accessibility, Document Structure, and Table Quality (proxy).</p>
+      <div class="rounded-2xl border border-slate-200 p-6 shine">
+        <h1 class="text-3xl font-extrabold tracking-tight">PDF Compatibility Scanner</h1>
+        <p class="text-slate-600 mt-2">Full-document analysis for chatbot readiness. <span class="font-medium">Confidence</span> is the average of <em>Text Accessibility</em>, <em>Document Structure</em>, and <em>Table Quality (proxy)</em>.</p>
+      </div>
     </header>
 
     <!-- Error banner -->
     <div id="error-display" class="hidden mb-4">
-      <div class="rounded-md bg-red-50 p-4 border border-red-200">
-        <div class="flex">
-          <div class="flex-shrink-0">
-            <svg class="h-5 w-5 text-red-600" viewBox="0 0 20 20" fill="currentColor">
-              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm-.75-5.25a.75.75 0 011.5 0v1.5a.75.75 0 01-1.5 0v-1.5zM10 6a.75.75 0 00-.75.75v4a.75.75 0 001.5 0v-4A.75.75 0 0010 6z" clip-rule="evenodd"/>
-            </svg>
-          </div>
-          <div class="ml-3">
-            <h3 class="text-sm font-medium text-red-800">Something went wrong</h3>
-            <div class="mt-2 text-sm text-red-700" id="error-message">Error text</div>
+      <div class="rounded-xl bg-red-50 border border-red-200 p-4">
+        <div class="flex items-start space-x-3">
+          <svg class="h-5 w-5 text-red-600 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm-.75-5.25a.75.75 0 011.5 0v1.5a.75.75 0 01-1.5 0v-1.5zM10 6a.75.75 0 00-.75.75v4a.75.75 0 001.5 0v-4A.75.75 0 0010 6z" clip-rule="evenodd"/>
+          </svg>
+          <div>
+            <h3 class="text-sm font-semibold text-red-800">Something went wrong</h3>
+            <p id="error-message" class="text-sm text-red-700 mt-1">Error text</p>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Upload section -->
+    <!-- Upload -->
     <section id="upload-section" class="mb-6">
-      <div id="upload-zone" class="border-2 border-dashed border-gray-300 rounded-xl p-8 cursor-pointer bg-white hover:bg-gray-50 transition">
-        <div class="text-center">
-          <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <div id="upload-zone" class="border-2 border-dashed border-slate-300 rounded-2xl p-10 cursor-pointer bg-white hover:bg-slate-50 transition">
+        <div class="text-center space-y-3">
+          <svg class="mx-auto h-12 w-12 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
               d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6h.1a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
           </svg>
-          <h2 class="mt-4 text-lg font-medium">Drop a PDF here, or click to select</h2>
-          <p class="text-sm text-gray-500 mt-1">Max size 50MB • We sample up to the first 10 pages for a quick read.</p>
+          <h2 class="text-lg font-semibold">Drop your PDF here, or click to select</h2>
+          <p class="text-sm text-slate-600">Max 50MB. We’ll scan <strong>every</strong> page with progressive updates.</p>
           <input id="file-input" type="file" accept="application/pdf" class="hidden" />
         </div>
       </div>
     </section>
 
-    <!-- File info -->
+    <!-- File Info -->
     <section id="file-info" class="hidden mb-6">
-      <div class="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between">
+      <div class="bg-white border border-slate-200 rounded-2xl p-4 flex items-center justify-between">
         <div>
           <p class="text-sm"><span class="font-medium">File:</span> <span id="file-name"></span></p>
-          <p class="text-sm text-gray-600"><span class="font-medium">Size:</span> <span id="file-size"></span></p>
+          <p class="text-sm text-slate-600"><span class="font-medium">Size:</span> <span id="file-size"></span></p>
         </div>
         <div class="space-x-2">
-          <button id="analyze-btn" class="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">Analyze</button>
-          <button id="remove-btn" class="px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200">Remove</button>
+          <button id="analyze-btn" class="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 shadow-sm">Analyze</button>
+          <button id="remove-btn" class="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200">Remove</button>
         </div>
       </div>
     </section>
 
     <!-- Progress -->
     <section id="analysis-progress" class="hidden mb-6">
-      <div class="bg-white border border-gray-200 rounded-xl p-4">
-        <p class="text-sm font-medium mb-2" id="progress-text">Starting analysis…</p>
-        <div class="w-full bg-gray-200 rounded-full h-2">
-          <div id="progress-bar" class="bg-blue-600 h-2 rounded-full" style="width: 10%"></div>
+      <div class="bg-white border border-slate-200 rounded-2xl p-4">
+        <div class="flex items-center justify-between mb-2">
+          <p class="text-sm font-medium" id="progress-text">Starting analysis…</p>
+          <p class="text-sm text-slate-600" id="progress-pages"></p>
+        </div>
+        <div class="w-full bg-slate-200 rounded-full h-2">
+          <div id="progress-bar" class="bg-gradient-to-r from-blue-600 to-emerald-500 h-2 rounded-full" style="width: 10%"></div>
         </div>
       </div>
     </section>
 
     <!-- Results -->
     <section id="results" class="hidden">
-      <div id="result-card" class="rounded-xl p-8 border-2 mb-6 bg-white border-gray-200">
+      <div id="result-card" class="rounded-2xl p-8 border-2 mb-6 bg-white border-slate-200">
         <div class="flex items-start space-x-4">
-          <div id="result-icon" class="w-12 h-12 rounded-full flex items-center justify-center bg-gray-100">
-            <svg class="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div id="result-icon" class="w-12 h-12 rounded-full flex items-center justify-center bg-slate-100">
+            <svg class="w-6 h-6 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3"></path>
             </svg>
           </div>
           <div class="flex-1">
-            <h3 id="result-title" class="text-2xl font-bold">Result</h3>
-            <p id="result-confidence" class="text-lg text-gray-700">—</p>
-            <p id="result-message" class="text-base mb-4 text-gray-700">—</p>
+            <div class="flex items-center gap-3">
+              <h3 id="result-title" class="text-2xl font-bold">Result</h3>
+              <span id="chip-suitable" class="hidden text-xs px-2 py-1 rounded-full bg-emerald-100 text-emerald-700">Suitable</span>
+              <span id="chip-nosuitable" class="hidden text-xs px-2 py-1 rounded-full bg-rose-100 text-rose-700">Not Suitable</span>
+            </div>
+            <p id="result-confidence" class="text-lg text-slate-700 mt-1">—</p>
+            <p id="result-message" class="text-base mb-4 text-slate-700">—</p>
 
             <!-- Breakdown -->
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-2">
-              <div class="bg-white border border-gray-200 rounded-xl p-4 flex items-center space-x-3">
-                <svg width="48" height="48" class="flex-shrink-0">
-                  <circle cx="24" cy="24" r="8" class="circle-bg" fill="none" stroke-width="4"></circle>
-                  <circle id="text-circle" cx="24" cy="24" r="8" class="circle-fg" fill="none" stroke-width="4"></circle>
+              <div class="bg-white border border-slate-200 rounded-xl p-4 flex items-center space-x-3">
+                <svg width="56" height="56" class="flex-shrink-0">
+                  <circle cx="28" cy="28" r="12" class="circle-bg" fill="none" stroke-width="6"></circle>
+                  <circle id="text-circle" cx="28" cy="28" r="12" class="circle-fg" fill="none" stroke-width="6" style="stroke:#3b82f6"></circle>
                 </svg>
                 <div>
-                  <p class="text-sm text-gray-600">Text Accessibility</p>
+                  <p class="text-sm text-slate-600">Text Accessibility</p>
                   <p id="text-score" class="text-xl font-semibold">0%</p>
                 </div>
               </div>
-              <div class="bg-white border border-gray-200 rounded-xl p-4 flex items-center space-x-3">
-                <svg width="48" height="48" class="flex-shrink-0">
-                  <circle cx="24" cy="24" r="8" class="circle-bg" fill="none" stroke-width="4"></circle>
-                  <circle id="structure-circle" cx="24" cy="24" r="8" class="circle-fg" fill="none" stroke-width="4"></circle>
+              <div class="bg-white border border-slate-200 rounded-xl p-4 flex items-center space-x-3">
+                <svg width="56" height="56" class="flex-shrink-0">
+                  <circle cx="28" cy="28" r="12" class="circle-bg" fill="none" stroke-width="6"></circle>
+                  <circle id="structure-circle" cx="28" cy="28" r="12" class="circle-fg" fill="none" stroke-width="6" style="stroke:#10b981"></circle>
                 </svg>
                 <div>
-                  <p class="text-sm text-gray-600">Document Structure</p>
+                  <p class="text-sm text-slate-600">Document Structure</p>
                   <p id="structure-score" class="text-xl font-semibold">0%</p>
                 </div>
               </div>
-              <div class="bg-white border border-gray-200 rounded-xl p-4 flex items-center space-x-3">
-                <svg width="48" height="48" class="flex-shrink-0">
-                  <circle cx="24" cy="24" r="8" class="circle-bg" fill="none" stroke-width="4"></circle>
-                  <circle id="table-circle" cx="24" cy="24" r="8" class="circle-fg" fill="none" stroke-width="4"></circle>
+              <div class="bg-white border border-slate-200 rounded-xl p-4 flex items-center space-x-3">
+                <svg width="56" height="56" class="flex-shrink-0">
+                  <circle cx="28" cy="28" r="12" class="circle-bg" fill="none" stroke-width="6"></circle>
+                  <circle id="table-circle" cx="28" cy="28" r="12" class="circle-fg" fill="none" stroke-width="6" style="stroke:#f59e0b"></circle>
                 </svg>
                 <div>
-                  <p class="text-sm text-gray-600">Table Quality (Proxy)</p>
+                  <p class="text-sm text-slate-600">Table Quality (Proxy)</p>
                   <p id="table-score" class="text-xl font-semibold">0%</p>
                 </div>
               </div>
             </div>
 
             <!-- Actions -->
-            <div class="mt-6 flex items-center space-x-2">
-              <button id="proceed-btn" class="hidden px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">Proceed</button>
-              <button id="guide-btn" class="hidden px-4 py-2 rounded-lg bg-amber-600 text-white hover:bg-amber-700">Optimization Guide</button>
-              <button id="reset-btn" class="ml-auto px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200">Reset</button>
+            <div class="mt-6 flex items-center gap-2">
+              <button id="proceed-btn" class="hidden px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm">Proceed</button>
+              <button id="guide-btn" class="hidden px-4 py-2 rounded-lg bg-amber-600 text-white hover:bg-amber-700 shadow-sm">Optimization Guide</button>
+              <button id="reset-btn" class="ml-auto px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200">Reset</button>
             </div>
 
-            <!-- Recommendation note (only for NOT SUITABLE) -->
-            <div id="recommendation" class="hidden mt-4 text-sm text-gray-700">
-              <p>Consider OCR cleanup for scanned pages, re-exporting from the source application, or replacing screenshot tables with selectable text tables.</p>
+            <!-- Recommendation -->
+            <div id="recommendation" class="hidden mt-4 text-sm text-slate-700">
+              <ul class="list-disc pl-6 space-y-1" id="rec-list"></ul>
             </div>
           </div>
         </div>
@@ -148,38 +156,104 @@
     </section>
   </div>
 
-  <!-- App Script -->
   <script>
-    // ====== Analyzer (real PDF heuristics) ======
+    // ====== Analyzer with full-document pass and progress callbacks ======
     class ImageFocusedPDFAnalyzer {
       constructor() {
         this.maxFileSize = 50 * 1024 * 1024; // 50MB
       }
 
-      async analyzePDF(file) {
+      async analyzePDF(file, onProgress) {
         const arrayBuffer = await file.arrayBuffer();
         const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 
         const blockersCheck = await this.checkBasicBlockers(pdf, file);
         if (blockersCheck.hasBlockers) return this.createBlockedResult(blockersCheck);
 
-        const imageTextAnalysis = await this.analyzeImageVsText(pdf);
-        const textExtractionTest = await this.testTextExtraction(pdf);
+        const pageCount = pdf.numPages;
+        const agg = {
+          totalTextLength: 0,
+          totalImageLikePages: 0,
+          pagesWithMeaningfulText: 0,
+          extractionQuality: 100,
+          extractionIssues: []
+        };
+
+        // Full-document loop with incremental updates
+        for (let i = 1; i <= pageCount; i++) {
+          const page = await pdf.getPage(i);
+          const textContent = await page.getTextContent();
+          const pageText = textContent.items.map(it => it.str).join(' ');
+          const cleanText = pageText.replace(/\s+/g, ' ').trim();
+
+          // Image vs Text heuristics
+          if (cleanText.length > 100) {
+            agg.pagesWithMeaningfulText++;
+            agg.totalTextLength += cleanText.length;
+          }
+          try {
+            const viewport = page.getViewport({ scale: 1.0 });
+            const pageArea = viewport.width * viewport.height;
+            const textDensity = cleanText.length / pageArea;
+            if (textDensity < 0.01 && cleanText.length < 200) agg.totalImageLikePages++;
+          } catch {
+            agg.totalImageLikePages++;
+          }
+
+          // Text extraction quality heuristics
+          if (/\uFFFD/.test(pageText) || /[^\x09\x0A\x0D\x20-\x7E]{10,}/.test(pageText)) {
+            agg.extractionQuality -= 15;
+            agg.extractionIssues.push("Unicode/encoding issues detected");
+          }
+          const ocrArtifacts = pageText.match(/[|]{2,}|_{3,}|\.{4,}|\s{10,}/g);
+          if (ocrArtifacts && ocrArtifacts.length > 2) {
+            agg.extractionQuality -= 20;
+            agg.extractionIssues.push("OCR artifacts suggest scanned content");
+          }
+          const words = pageText.split(/\s+/).filter(w => w.length > 2);
+          if (words.length < 20) {
+            agg.extractionQuality -= 10;
+            agg.extractionIssues.push("Very low text content on page " + i);
+          }
+
+          // Progress callback
+          if (typeof onProgress === 'function') {
+            const pct = Math.round((i / pageCount) * 100);
+            onProgress(pct, `Analyzing page ${i}/${pageCount}…`, i, pageCount);
+            // allow UI to paint between pages
+            await new Promise(r => setTimeout(r, 0));
+          }
+        }
+
+        // Post-processing into the three gauges
+        const textPageRatio = agg.pagesWithMeaningfulText / pageCount;
+        const imagePageRatio = agg.totalImageLikePages / pageCount;
+
+        const imageTextAnalysis = {
+          textPageRatio,
+          imagePageRatio,
+          avgTextPerPage: agg.totalTextLength / Math.max(agg.pagesWithMeaningfulText, 1),
+          hasImageProblem: imagePageRatio > 0.3 || textPageRatio < 0.7
+        };
+
+        const textExtractionTest = {
+          quality: Math.max(0, agg.extractionQuality),
+          issues: [...new Set(agg.extractionIssues)],
+          hasExtractionProblems: agg.extractionQuality < 70
+        };
+
+        // Structure check (quick signals from first page + length)
         const basicStructureCheck = await this.checkBasicStructure(pdf);
 
-        return this.calculateSimplifiedScore({
-          imageTextAnalysis,
-          textExtractionTest,
-          basicStructureCheck
-        });
+        return this.calculateFinalScore({ imageTextAnalysis, textExtractionTest, basicStructureCheck });
       }
 
       async checkBasicBlockers(pdf, file) {
         const blockers = [];
         try {
-          if (file.size > 25 * 1024 * 1024) blockers.push("File exceeds API upload limits (>25MB)");
-          if (pdf.numPages > 200) blockers.push("Too many pages may cause processing timeout");
-          await pdf.getPage(1); // corruption check
+          if (file.size > 25 * 1024 * 1024) blockers.push("File exceeds common upload limits (>25MB)");
+          if (pdf.numPages > 2000) blockers.push("Unusually large document; may time out in downstream systems");
+          await pdf.getPage(1);
         } catch (e) {
           blockers.push("PDF appears corrupted or unreadable");
         }
@@ -201,84 +275,8 @@
         };
       }
 
-      async analyzeImageVsText(pdf) {
-        let totalTextLength = 0;
-        let totalImageLikePages = 0;
-        let pagesWithMeaningfulText = 0;
-        const samplePages = Math.min(10, pdf.numPages);
-
-        for (let i = 1; i <= samplePages; i++) {
-          const page = await pdf.getPage(i);
-          const textContent = await page.getTextContent();
-          const pageText = textContent.items.map(it => it.str).join(' ');
-          const cleanText = pageText.replace(/\s+/g, ' ').trim();
-
-          if (cleanText.length > 100) {
-            pagesWithMeaningfulText++;
-            totalTextLength += cleanText.length;
-          }
-
-          try {
-            const viewport = page.getViewport({ scale: 1.0 });
-            const pageArea = viewport.width * viewport.height;
-            const textDensity = cleanText.length / pageArea;
-            if (textDensity < 0.01 && cleanText.length < 200) totalImageLikePages++;
-          } catch {
-            totalImageLikePages++;
-          }
-        }
-
-        const textPageRatio = pagesWithMeaningfulText / samplePages;
-        const imagePageRatio = totalImageLikePages / samplePages;
-
-        return {
-          textPageRatio,
-          imagePageRatio,
-          avgTextPerPage: totalTextLength / Math.max(pagesWithMeaningfulText, 1),
-          hasImageProblem: imagePageRatio > 0.3 || textPageRatio < 0.7
-        };
-      }
-
-      async testTextExtraction(pdf) {
-        let extractionQuality = 100;
-        const issues = [];
-        const testPages = Math.min(3, pdf.numPages);
-
-        for (let i = 1; i <= testPages; i++) {
-          const page = await pdf.getPage(i);
-          const textContent = await page.getTextContent();
-          const text = textContent.items.map(it => it.str).join(' ');
-
-          // Encoding issues: Unicode replacement or long runs of non-ASCII
-          if (/\uFFFD/.test(text) || /[^\x09\x0A\x0D\x20-\x7E]{10,}/.test(text)) {
-            extractionQuality -= 15;
-            issues.push("Unicode/encoding issues detected");
-          }
-
-          // OCR artifacts
-          const ocrArtifacts = text.match(/[|]{2,}|_{3,}|\.{4,}|\s{10,}/g);
-          if (ocrArtifacts && ocrArtifacts.length > 2) {
-            extractionQuality -= 20;
-            issues.push("OCR artifacts suggest scanned content");
-          }
-
-          // Very low text density
-          const words = text.split(/\s+/).filter(w => w.length > 2);
-          if (words.length < 20) {
-            extractionQuality -= 10;
-            issues.push("Very low text content per page");
-          }
-        }
-
-        return {
-          quality: Math.max(0, extractionQuality),
-          issues,
-          hasExtractionProblems: extractionQuality < 70
-        };
-      }
-
       async checkBasicStructure(pdf) {
-        let structureScore = 50; // neutral baseline
+        let structureScore = 50;
         try {
           const firstPage = await pdf.getPage(1);
           const textContent = await firstPage.getTextContent();
@@ -288,38 +286,30 @@
           let potentialHeadings = 0;
           for (const line of lines.slice(0, 15)) {
             const s = line.trim();
-            if (
-              s.length < 60 &&
-              (s === s.toUpperCase() || s.endsWith(':') || /^\d+\./.test(s))
-            ) {
+            if (s.length < 60 && (s === s.toUpperCase() || s.endsWith(':') || /^\d+\./.test(s))) {
               potentialHeadings++;
             }
           }
           if (potentialHeadings >= 2) structureScore += 30;
-          if (pdf.numPages >= 2 && pdf.numPages <= 50) structureScore += 20;
+          if (pdf.numPages >= 2 && pdf.numPages <= 200) structureScore += 20;
         } catch {
-          structureScore = 30; // low if unreadable
+          structureScore = 30;
         }
-
         return { score: Math.min(100, structureScore), hasBasicStructure: structureScore >= 60 };
       }
 
-      // === FINAL SCORING ===
-      calculateSimplifiedScore({ imageTextAnalysis, textExtractionTest, basicStructureCheck }) {
-        // Build the three displayed metrics:
+      // Confidence = average of the three displayed metrics
+      calculateFinalScore({ imageTextAnalysis, textExtractionTest, basicStructureCheck }) {
         const breakdown = {
           textAccessibility: Math.round(imageTextAnalysis.textPageRatio * 100),
           documentStructure: Math.round(basicStructureCheck.score),
-          // Table quality proxy: fewer image-like pages => better chance tables are selectable text
           tableQuality: Math.max(0, 100 - Math.round(imageTextAnalysis.imagePageRatio * 100))
         };
 
-        // CONFIDENCE = average of the three gauges
         const confidence = Math.round(
           (breakdown.textAccessibility + breakdown.documentStructure + breakdown.tableQuality) / 3
         );
 
-        // Suitability uses the averaged confidence directly
         const suitable = confidence >= 65;
 
         return {
@@ -334,22 +324,15 @@
 
       generateSimpleRecommendations({ imageTextAnalysis, textExtractionTest }, confidence) {
         const recs = [];
-        if (imageTextAnalysis.hasImageProblem) {
-          recs.push("High image content detected—likely scanned pages or screenshot tables.");
-        }
-        if (textExtractionTest.hasExtractionProblems) {
-          recs.push("Text extraction issues found—OCR cleanup may be needed.");
-        }
-        if (textExtractionTest.issues.length > 0) {
-          recs.push(`Specific issues: ${textExtractionTest.issues.join(", ")}`);
-        }
+        if (imageTextAnalysis.hasImageProblem) recs.push("High image content detected—likely scanned pages or screenshot tables.");
+        if (textExtractionTest.hasExtractionProblems) recs.push("Text extraction issues found—OCR cleanup may be needed.");
+        if (textExtractionTest.issues.length > 0) recs.push(`Specific issues: ${textExtractionTest.issues.join(", ")}`);
         if (confidence < 65) {
-          recs.push("RECOMMEND: Professional clean-up to improve text extraction.");
-          recs.push("Document likely contains too much image-based content for optimal chatbot performance.");
+          recs.push("RECOMMEND: Re-export from the source app or run OCR to improve text selection.");
         } else if (confidence < 80) {
-          recs.push("Document should work but may have some image-based content issues. Consider optimizations.");
+          recs.push("Document should work, but consider minor cleanups (replace screenshot tables, ensure text is selectable).");
         } else {
-          recs.push("Document appears to have good text content and should work well.");
+          recs.push("Looks solid. Proceed with confidence.");
         }
         return recs;
       }
@@ -414,12 +397,9 @@
         if (!this.currentFile) return;
         this.showProgress();
         try {
-          this.updateProgress(10, 'Reading PDF structure…'); await this.delay(200);
-          this.updateProgress(40, 'Analyzing text content…'); await this.delay(200);
-          this.updateProgress(70, 'Checking document organization…');
-          const result = await this.analyzer.analyzePDF(this.currentFile);
-          this.updateProgress(90, 'Calculating readiness score…'); await this.delay(150);
-          this.updateProgress(100, 'Analysis complete!'); await this.delay(200);
+          const result = await this.analyzer.analyzePDF(this.currentFile, (pct, text, page, total) => {
+            this.updateProgress(pct, text, page, total);
+          });
           this.showResults(result);
         } catch (e) {
           console.error('Analysis failed:', e);
@@ -431,19 +411,19 @@
       showProgress() {
         document.getElementById('file-info').classList.add('hidden');
         document.getElementById('analysis-progress').classList.remove('hidden');
+        this.updateProgress(5, 'Preparing PDF…');
       }
       hideProgress() {
         document.getElementById('analysis-progress').classList.add('hidden');
       }
-      updateProgress(percent, text) {
+      updateProgress(percent, text, page = null, total = null) {
         document.getElementById('progress-bar').style.width = `${percent}%`;
-        document.getElementById('progress-text').textContent = text;
+        document.getElementById('progress-text').textContent = text || 'Analyzing…';
+        document.getElementById('progress-pages').textContent = (page && total) ? `${page}/${total} pages` : '';
       }
 
       showResults(result) {
         this.hideProgress();
-
-        // Expose for debugging in DevTools
         window.__lastResult = result;
 
         const resultCard = document.getElementById('result-card');
@@ -452,51 +432,61 @@
         const resultConfidence = document.getElementById('result-confidence');
         const resultMessage = document.getElementById('result-message');
         const recommendation = document.getElementById('recommendation');
+        const chipOk = document.getElementById('chip-suitable');
+        const chipNo = document.getElementById('chip-nosuitable');
+        const recList = document.getElementById('rec-list');
+
+        recList.innerHTML = '';
+        if (result.recommendations && result.recommendations.length) {
+          recommendation.classList.remove('hidden');
+          result.recommendations.forEach(r => {
+            const li = document.createElement('li');
+            li.textContent = r;
+            recList.appendChild(li);
+          });
+        } else {
+          recommendation.classList.add('hidden');
+        }
 
         if (result.suitable) {
-          resultCard.className = 'rounded-xl p-8 border-2 mb-6 bg-green-50 border-green-200';
-          resultIcon.className = 'w-12 h-12 rounded-full flex items-center justify-center bg-green-100';
-          resultIcon.innerHTML = '<svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>';
-          resultTitle.textContent = '✅ APPROVED - Chatbot Ready';
-          resultTitle.className = 'text-2xl font-bold text-green-900';
+          resultCard.className = 'rounded-2xl p-8 border-2 mb-6 bg-emerald-50/60 border-emerald-200';
+          resultIcon.className = 'w-12 h-12 rounded-full flex items-center justify-center bg-emerald-100';
+          resultIcon.innerHTML = '<svg class="w-6 h-6 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>';
+          resultTitle.textContent = '✅ APPROVED — Chatbot Ready';
+          chipOk.classList.remove('hidden'); chipNo.classList.add('hidden');
           resultConfidence.textContent = `${result.confidence}% Confidence`;
-          resultConfidence.className = 'text-lg text-green-800';
-          resultMessage.textContent = 'This document will work well with our chatbot system.';
-          resultMessage.className = 'text-base mb-4 text-green-800';
-          recommendation.classList.add('hidden');
+          resultMessage.textContent = 'This document should work well with the chatbot.';
           document.getElementById('proceed-btn').classList.remove('hidden');
           document.getElementById('guide-btn').classList.add('hidden');
         } else {
-          resultCard.className = 'rounded-xl p-8 border-2 mb-6 bg-red-50 border-red-200';
-          resultIcon.className = 'w-12 h-12 rounded-full flex items-center justify-center bg-red-100';
-          resultIcon.innerHTML = '<svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>';
+          resultCard.className = 'rounded-2xl p-8 border-2 mb-6 bg-rose-50/60 border-rose-200';
+          resultIcon.className = 'w-12 h-12 rounded-full flex items-center justify-center bg-rose-100';
+          resultIcon.innerHTML = '<svg class="w-6 h-6 text-rose-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>';
           resultTitle.textContent = '❌ NOT SUITABLE';
-          resultTitle.className = 'text-2xl font-bold text-red-900';
+          chipNo.classList.remove('hidden'); chipOk.classList.add('hidden');
           resultConfidence.textContent = `${result.confidence}% Confidence`;
-          resultConfidence.className = 'text-lg text-red-800';
-          resultMessage.textContent = 'This document needs optimization for chatbot compatibility.';
-          resultMessage.className = 'text-base mb-4 text-red-800';
-          recommendation.classList.remove('hidden');
+          resultMessage.textContent = 'Needs optimization before using with the chatbot.';
           document.getElementById('proceed-btn').classList.add('hidden');
           document.getElementById('guide-btn').classList.remove('hidden');
         }
 
-        this.animateCircle('text-circle', 'text-score', result.breakdown.textAccessibility, '#3b82f6');
-        this.animateCircle('structure-circle', 'structure-score', result.breakdown.documentStructure, '#10b981');
-        this.animateCircle('table-circle', 'table-score', result.breakdown.tableQuality, '#f59e0b');
+        this.animateCircle('text-circle', 'text-score', result.breakdown.textAccessibility);
+        this.animateCircle('structure-circle', 'structure-score', result.breakdown.documentStructure);
+        this.animateCircle('table-circle', 'table-score', result.breakdown.tableQuality);
 
         document.getElementById('results').classList.remove('hidden');
       }
 
-      animateCircle(circleId, scoreId, percentage, color) {
+      animateCircle(circleId, scoreId, percentage) {
         const circle = document.getElementById(circleId);
         const scoreElement = document.getElementById(scoreId);
-        const circumference = 2 * Math.PI * 8; // r = 8
+        // r = 12 => circumference:
+        const circumference = 2 * Math.PI * 12;
         const pct = Math.max(0, Math.min(percentage, 100));
         const offset = circumference - (pct / 100) * circumference;
-        circle.style.stroke = color;
+        circle.style.strokeDasharray = `${circumference}`;
         circle.style.strokeDashoffset = offset;
-        circle.style.transition = 'stroke-dashoffset 1s ease-in-out';
+        circle.style.transition = 'stroke-dashoffset 700ms ease-in-out';
         scoreElement.textContent = `${Math.round(pct)}%`;
       }
 
@@ -516,7 +506,6 @@
         document.getElementById('file-input').value = '';
         this.hideError();
       }
-      delay(ms) { return new Promise(r => setTimeout(r, ms)); }
     }
 
     document.addEventListener('DOMContentLoaded', () => new UIController());
