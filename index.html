@@ -16,7 +16,6 @@
   </script>
 
   <style>
-    /* Small utility for circular progress visuals */
     .circle-bg { stroke: #e5e7eb; } /* gray-200 */
     .circle-fg { stroke-linecap: round; stroke-dasharray: 50.265; stroke-dashoffset: 50.265; } /* 2πr where r=8 => 50.265 */
   </style>
@@ -25,7 +24,7 @@
   <div class="max-w-3xl mx-auto p-6">
     <header class="mb-6">
       <h1 class="text-3xl font-bold">PDF Compatibility Scanner</h1>
-      <p class="text-gray-600 mt-1">Quickly assess whether a PDF is likely to work well with the chatbot (text accessibility, structure, and table quality proxy).</p>
+      <p class="text-gray-600 mt-1">Assess whether a PDF is likely to work well with the chatbot. Confidence = average of Text Accessibility, Document Structure, and Table Quality (proxy).</p>
     </header>
 
     <!-- Error banner -->
@@ -151,7 +150,7 @@
 
   <!-- App Script -->
   <script>
-    // ====== Analyzer ======
+    // ====== Analyzer (real PDF heuristics) ======
     class ImageFocusedPDFAnalyzer {
       constructor() {
         this.maxFileSize = 50 * 1024 * 1024; // 50MB
@@ -212,7 +211,7 @@
           const page = await pdf.getPage(i);
           const textContent = await page.getTextContent();
           const pageText = textContent.items.map(it => it.str).join(' ');
-          const cleanText = pageText.replace(/\\s+/g, ' ').trim();
+          const cleanText = pageText.replace(/\s+/g, ' ').trim();
 
           if (cleanText.length > 100) {
             pagesWithMeaningfulText++;
@@ -250,18 +249,21 @@
           const textContent = await page.getTextContent();
           const text = textContent.items.map(it => it.str).join(' ');
 
-          if (/\\uFFFD/.test(text) || /[^\\x09\\x0A\\x0D\\x20-\\x7E]{10,}/.test(text)) {
+          // Encoding issues: Unicode replacement or long runs of non-ASCII
+          if (/\uFFFD/.test(text) || /[^\x09\x0A\x0D\x20-\x7E]{10,}/.test(text)) {
             extractionQuality -= 15;
             issues.push("Unicode/encoding issues detected");
           }
 
-          const ocrArtifacts = text.match(/[|]{2,}|_{3,}|\\.{4,}|\\s{10,}/g);
+          // OCR artifacts
+          const ocrArtifacts = text.match(/[|]{2,}|_{3,}|\.{4,}|\s{10,}/g);
           if (ocrArtifacts && ocrArtifacts.length > 2) {
             extractionQuality -= 20;
             issues.push("OCR artifacts suggest scanned content");
           }
 
-          const words = text.split(/\\s+/).filter(w => w.length > 2);
+          // Very low text density
+          const words = text.split(/\s+/).filter(w => w.length > 2);
           if (words.length < 20) {
             extractionQuality -= 10;
             issues.push("Very low text content per page");
@@ -276,64 +278,75 @@
       }
 
       async checkBasicStructure(pdf) {
-        let structureScore = 50;
+        let structureScore = 50; // neutral baseline
         try {
           const firstPage = await pdf.getPage(1);
           const textContent = await firstPage.getTextContent();
-          const text = textContent.items.map(it => it.str).join('\\n');
-          const lines = text.split('\\n').filter(l => l.trim().length > 5);
+          const text = textContent.items.map(it => it.str).join('\n');
+          const lines = text.split('\n').filter(l => l.trim().length > 5);
 
           let potentialHeadings = 0;
           for (const line of lines.slice(0, 15)) {
             const s = line.trim();
-            if (s.length < 60 && (s === s.toUpperCase() || s.endsWith(':') || /^\\d+\\./.test(s))) {
+            if (
+              s.length < 60 &&
+              (s === s.toUpperCase() || s.endsWith(':') || /^\d+\./.test(s))
+            ) {
               potentialHeadings++;
             }
           }
           if (potentialHeadings >= 2) structureScore += 30;
           if (pdf.numPages >= 2 && pdf.numPages <= 50) structureScore += 20;
         } catch {
-          structureScore = 30;
+          structureScore = 30; // low if unreadable
         }
+
         return { score: Math.min(100, structureScore), hasBasicStructure: structureScore >= 60 };
       }
 
+      // === FINAL SCORING ===
       calculateSimplifiedScore({ imageTextAnalysis, textExtractionTest, basicStructureCheck }) {
-        let score = 0;
-        const textContentScore = imageTextAnalysis.textPageRatio * 60;
-        const imagePenalty = imageTextAnalysis.imagePageRatio * 30;
-        score += Math.max(0, textContentScore - imagePenalty);
-        score += (textExtractionTest.quality / 100) * 30;
-        score += (basicStructureCheck.score / 100) * 10;
-
-        const finalScore = Math.round(Math.max(0, Math.min(score, 100)));
-        const suitable = finalScore >= 65;
-
+        // Build the three displayed metrics:
         const breakdown = {
           textAccessibility: Math.round(imageTextAnalysis.textPageRatio * 100),
           documentStructure: Math.round(basicStructureCheck.score),
+          // Table quality proxy: fewer image-like pages => better chance tables are selectable text
           tableQuality: Math.max(0, 100 - Math.round(imageTextAnalysis.imagePageRatio * 100))
         };
 
+        // CONFIDENCE = average of the three gauges
+        const confidence = Math.round(
+          (breakdown.textAccessibility + breakdown.documentStructure + breakdown.tableQuality) / 3
+        );
+
+        // Suitability uses the averaged confidence directly
+        const suitable = confidence >= 65;
+
         return {
           suitable,
-          confidence: finalScore,
+          confidence,
           breakdown,
           blocked: false,
           rawAnalyses: { imageTextAnalysis, textExtractionTest, basicStructureCheck },
-          recommendations: this.generateSimpleRecommendations({ imageTextAnalysis, textExtractionTest }, finalScore)
+          recommendations: this.generateSimpleRecommendations({ imageTextAnalysis, textExtractionTest }, confidence)
         };
       }
 
-      generateSimpleRecommendations({ imageTextAnalysis, textExtractionTest }, score) {
+      generateSimpleRecommendations({ imageTextAnalysis, textExtractionTest }, confidence) {
         const recs = [];
-        if (imageTextAnalysis.hasImageProblem) recs.push("High image content detected—likely scanned pages or screenshot tables.");
-        if (textExtractionTest.hasExtractionProblems) recs.push("Text extraction issues found—OCR cleanup may be needed.");
-        if (textExtractionTest.issues.length > 0) recs.push(`Specific issues: ${textExtractionTest.issues.join(", ")}`);
-        if (score < 65) {
+        if (imageTextAnalysis.hasImageProblem) {
+          recs.push("High image content detected—likely scanned pages or screenshot tables.");
+        }
+        if (textExtractionTest.hasExtractionProblems) {
+          recs.push("Text extraction issues found—OCR cleanup may be needed.");
+        }
+        if (textExtractionTest.issues.length > 0) {
+          recs.push(`Specific issues: ${textExtractionTest.issues.join(", ")}`);
+        }
+        if (confidence < 65) {
           recs.push("RECOMMEND: Professional clean-up to improve text extraction.");
           recs.push("Document likely contains too much image-based content for optimal chatbot performance.");
-        } else if (score < 80) {
+        } else if (confidence < 80) {
           recs.push("Document should work but may have some image-based content issues. Consider optimizations.");
         } else {
           recs.push("Document appears to have good text content and should work well.");
@@ -430,6 +443,9 @@
       showResults(result) {
         this.hideProgress();
 
+        // Expose for debugging in DevTools
+        window.__lastResult = result;
+
         const resultCard = document.getElementById('result-card');
         const resultIcon = document.getElementById('result-icon');
         const resultTitle = document.getElementById('result-title');
@@ -443,7 +459,7 @@
           resultIcon.innerHTML = '<svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>';
           resultTitle.textContent = '✅ APPROVED - Chatbot Ready';
           resultTitle.className = 'text-2xl font-bold text-green-900';
-          resultConfidence.textContent = `${result.confidence}% Confidence Score`;
+          resultConfidence.textContent = `${result.confidence}% Confidence`;
           resultConfidence.className = 'text-lg text-green-800';
           resultMessage.textContent = 'This document will work well with our chatbot system.';
           resultMessage.className = 'text-base mb-4 text-green-800';
@@ -456,7 +472,7 @@
           resultIcon.innerHTML = '<svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>';
           resultTitle.textContent = '❌ NOT SUITABLE';
           resultTitle.className = 'text-2xl font-bold text-red-900';
-          resultConfidence.textContent = `${result.confidence}% Confidence Score`;
+          resultConfidence.textContent = `${result.confidence}% Confidence`;
           resultConfidence.className = 'text-lg text-red-800';
           resultMessage.textContent = 'This document needs optimization for chatbot compatibility.';
           resultMessage.className = 'text-base mb-4 text-red-800';
@@ -465,7 +481,6 @@
           document.getElementById('guide-btn').classList.remove('hidden');
         }
 
-        // Breakdown circles
         this.animateCircle('text-circle', 'text-score', result.breakdown.textAccessibility, '#3b82f6');
         this.animateCircle('structure-circle', 'structure-score', result.breakdown.documentStructure, '#10b981');
         this.animateCircle('table-circle', 'table-score', result.breakdown.tableQuality, '#f59e0b');
